@@ -9,6 +9,7 @@ import termios
 import threading
 import time
 import tty
+import array
 
 # The frequency to check the child process' `cwd` and update our own
 CWD_UPDATE_INTERVAL = 1 / 4
@@ -81,7 +82,13 @@ def run_program(program_args):
 
     # Update the slave's window size as the master is capturing the signals
     def window_resize_handler(*_):
-        size = fcntl.ioctl(sys.stdin.fileno(), termios.TIOCGWINSZ, '0000')
+        buf = array.array('H', [0, 0, 0, 0])
+        try:
+            fcntl.ioctl(sys.stdin.fileno(), termios.TIOCGWINSZ, buf, True)
+        except OSError:
+            # Fallback if stdin is not a TTY or ioctl fails
+            buf = array.array('H', [24, 80, 0, 0])
+        size = buf.tobytes()
         fcntl.ioctl(master_fd, termios.TIOCSWINSZ, size)
 
     if sys.stdin.isatty():
